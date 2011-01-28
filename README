@@ -1,1 +1,28 @@
-<h2>Edible Charts - A canvas charting library focused on visuals and motion-graphics.</h2>
+Edible Charts - A canvas charting library focused on visuals and motion-graphics.
+
+CHART FUNCTIONALITY TODO LIST:
+		
+		General Functionality:
+		-Global Highlight/Hover helper
+		-Global Universal Start/End Transitions
+		-Global "switching" menu (e.g.: go from pie to area to trend one value...)
+		-DEFAULT SETTING DOESNT ALLOW FOR PASSING OF ZERO VALUE
+		
+		Existing Chart Types:
+		PIE:
+			-Fix functionality on smalll charts
+			-Develop Hover/Highlight functionality
+			-Develop Spin functionality (for fun!)
+			
+		Bar/Column:
+			-Draw in Metrics
+			-Use clearRect to prevent overflow DONE
+			-Bar Shadow at higher angle
+			-Blur on Bar
+			-Switch Column axes labels
+			
+		New Chart Types:
+		Area (stack/non-stack)
+		Line
+		Streamgraph
+		Bubble

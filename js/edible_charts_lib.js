@@ -1,31 +1,8 @@
-/**		CHART FUNCTIONALITY TODO LIST:
-		
-		General Functionality:
-		-Global Highlight/Hover helper
-		-Global Universal Start/End Transitions
-		-Global "switching" menu (e.g.: go from pie to area to trend one value...)
-		-DEFAULT SETTING DOESNT ALLOW FOR PASSING OF ZERO VALUE
-		
-		Existing Chart Types:
-		PIE:
-			-Fix functionality on smalll charts
-			-Develop Hover/Highlight functionality
-			-Develop Spin functionality (for fun!)
-		Bar/Column:
-			-Draw in Metrics
-			-Use clearRect to prevent overflow
-			-Bar Shadow at higher angle
-			-Blur on Bar
-			-Switch Column axes labels
-			
-		New Chart Types:
-		Area (stack/non-stack)
-		Line
-		Streamgraph
-		Bubble
-		
-
-**/
+/* Edible Charts
+ * By Andy Hattemer http://www.scriptedlife.com
+ * MIT Licensed.
+ */
+ 
 //HEX TO RGB FUNCTIONS
 function cutHex(h) {return (h.charAt(0)=="#") ? h.substring(1,7):h}
 function hexToR(h) {return parseInt((cutHex(h)).substring(0,2),16);}
@@ -37,40 +14,48 @@ function getB(rgb) {return parseInt(rgb.match(/\((\d+), ?(\d+), ?(\d+)/)[3]); }
 
 var Chart = Class.extend({
 	init: function(canvas_name, options){
+				
 		this.opt = options.params || {};
 		this.series = options.series || {};
 		this.catAx = options.catAxis || {};
 		this.metAx = options.metAxis || {};
-		options = null;
 		
-		this.opt.title = this.opt.title || '';
-		this.opt.subtitle = this.opt.subtitle || '';
-		this.opt.margin = this.opt.margin || 20;
-		this.opt.marginX = this.opt.marginX || this.opt.margin;
-		this.opt.marginY = this.opt.marginY || this.opt.margin;
-		this.opt.minigap = this.opt.minigap || 2;
-		this.opt.maxigap = this.opt.maxigap || 10;
-		this.opt.shadow = this.opt.shadow || 4;
-		this.opt.sort = this.opt.sort || -1;
-		this.opt.stack = this.opt.stack || 0;
-		this.opt.animate = (this.opt.animate+1)%2 || 0;
-		this.opt.animate_2 = (this.opt.animate_2+1)%2 || this.opt.animate;
-		this.opt.speed = this.opt.speed || 10;
-		this.opt.labelspace = this.opt.labelspace || 50;
-		this.opt.titlespace = this.opt.titlespace || 20;
-		this.mtrack = "";
-		this.pal = [
-			[[0, 160, 176], [106, 74, 60], [204, 51, 63], [235, 104, 65], [237, 201, 81], [100, 54, 132]],	//PALLETTE 1
-			[[131,104,213], [23,158,221], [143,215,39], [238,208,42], [246,154,32], [245,42,31], [120,118,121], [226,226,226]],
-			[[40,40,40], [110,110,110], [170,170,170], [70,70,70], [140,140,140]]
-			];
-		
-		//CANVAS SETUP
+   		//CANVAS SETUP
 		this.canvas = document.getElementById(canvas_name);
 		this.ctx = this.canvas.getContext("2d");
 		this.ctx.lineCap = "round";
 		this.opt.ch = parseInt(this.canvas.getAttribute("height"), 10);
 		this.opt.cw = parseInt(this.canvas.getAttribute("width"), 10);
+		
+		//INDIVIDUAL CONFIGURATION OPTIONS
+		options = null;
+  		this.opt.title = this.opt.title || '';
+  		this.opt.subtitle = this.opt.subtitle || '';	
+		this.opt.margin = this.opt.margin || 20;		//optionally defines all margins at once
+		this.opt.marginX = this.opt.marginX || this.opt.margin;
+		this.opt.marginY = this.opt.marginY || this.opt.margin;
+		this.opt.minigap = this.opt.minigap || 2;		//gap between grouped bars or columns
+		this.opt.maxigap = this.opt.maxigap || 10;	//gap between pie slices, bar or column groups, etc...
+		this.opt.three_d = this.opt.three_d || 4;		//"3Dness" (depth) of a chart, when available
+		this.opt.shadow = this.opt.shadow || 10;		//blurry dropshadow drawn behind certain shapes
+		this.opt.sort = this.opt.sort || -1;		//if set, the nth category is sorted, and everything else follows
+		this.opt.stack = this.opt.stack || 0;		//set to 1 means chart will try to be stacked (area, bar, column, streamgraph)
+		this.opt.animate = (this.opt.animate+1)%2 || 0;   //animation counter, (goes from zero to 1) in parameters 0 means no animation, 1 = default
+		this.opt.animate_2 = (this.opt.animate_2+1)%2 || this.opt.animate;   //fancier charts use this for two-stage animation
+		this.opt.speed = this.opt.speed || 10;		//speed defines how quickly animate increments
+		this.opt.labelspace = this.opt.labelspace || 50;   //padding for axis labels on some charts
+		this.opt.titlespace = this.opt.titlespace || 20;   //padding for title on all charts
+		this.mtrack = "";
+		this.pal = [
+			[[0, 160, 176], [106, 74, 60], [204, 51, 63], [235, 104, 65], [237, 201, 81], [100, 54, 132]],
+			[[131,104,213], [23,158,221], [143,215,39], [238,208,42], [246,154,32], [245,42,31], [120,118,121], [226,226,226]],
+			[[40,40,40], [110,110,110], [170,170,170], [70,70,70], [140,140,140]]
+			];
+		this.opt.pal_id = 1;		//default to the second (above) palette feat. 8 colors, later add in more colors and smart palette choosing
+		this.opt.cw_w = this.opt.cw-(this.opt.marginX*2);   //available horizontal working area
+		this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace-this.opt.three_d;   //available vertical working area
+		this.opt.startX = this.opt.marginX + 5;		//where to start X
+		this.opt.smooth = this.opt.smooth || 0;		//smoothing is available for line, area, and streamgraphs (see below)
 		
 		//SET MAX/MINS
 		this.opt.max = -9999999999;
@@ -78,17 +63,13 @@ var Chart = Class.extend({
 		this.opt.seriesMax = 0;
 		this.opt.cmax = this.opt.max;
 		this.opt.cmin = this.opt.min;
-		
-		this.opt.pal_id = 1;
-
 		var serlen = this.series.length, i;
-		this.opt.categoryTotals = [];
-		this.opt.seriesTotals = [];
-		//GATHER ODD AND EVEN DATA FOR STREAMGRAPH
-		this.opt.categoryTotals_split = [[],[]];
+		this.opt.categoryTotals = [];			//sum of columns
+		this.opt.seriesTotals = [];				//sum of rows
+		this.opt.categoryTotals_split = [[],[]];	//streamgraphs require alternating column sums (top and bottom halves)
 		for(i=0; i<serlen; i++) {
 			this.opt.seriesTotals[i] = 0;
-			this.series[i].color = this.series[i].color || 'rgb(' + this.pal[this.opt.pal_id][i][0] + ', ' +  this.pal[this.opt.pal_id][i][1] + ', ' +  this.pal[this.opt.pal_id][i][2] + ')';
+			this.series[i].color = this.series[i].color || 'rgb(' + this.pal[this.opt.pal_id][i][0] + ', ' +  this.pal[this.opt.pal_id][i][1] + ', ' +  this.pal[this.opt.pal_id][i][2] + ')';		//series can optionally have colors defined in parameters
 			var dlen = this.series[i].data.length, j;
 			if(dlen > this.opt.seriesMax) { this.opt.seriesMax = dlen; };
 			for(j=0; j<dlen; j++) {
@@ -120,8 +101,8 @@ var Chart = Class.extend({
 			}
 		}
 		
+		//sort requires sort is set to a number less than the number of series
 		if(this.opt.sort >= 0 && this.opt.sort < serlen) {
-			
 			//SORT DATA BY SERIES IDENTIFIED IN this.opt.sort
 			var tsort = this.series[this.opt.sort].data.slice();
 			var tslen = tsort.length;
@@ -161,24 +142,18 @@ var Chart = Class.extend({
 			this.metAx.title = temp;
 		}
 		
-		//SORT BY SERIES IF SET (FOR AREA)
+		//SORT BY SERIES IF SET (FOR AREA OR STREAMGRAPH)
 		if(this.opt.sort_by_series && !this.opt.stack) { this.sortBySeries();}
 		
 		//SMOOTHING STUFF
-		this.opt.cw_w = this.opt.cw-(this.opt.marginX*2);
-		this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace-this.opt.shadow;
-		this.opt.startX = this.opt.marginX + 5;
-		this.opt.smooth = this.opt.smooth || 0;
-		this.opt.increment = this.opt.cw_w/(this.opt.seriesMax-1);
-		this.opt.smooth_amount = this.opt.smooth_amount || 3;
+		this.opt.increment = this.opt.cw_w/(this.opt.seriesMax+1);
+		this.opt.smooth_amount = this.opt.smooth_amount || 4;
 		if(this.opt.smooth_amount < 2) {this.opt.smooth_amount = 2;}
 		
 		if(this.opt.smooth) {
 			var stackAdd = [];
-			
 			var tmax = this.opt.max;
 			if(this.opt.stack) {tmax = this.opt.cmax;}
-			
 			var tot_len = this.series.length, i;
 			for(i=0; i<tot_len; i++) {
 				var ind_len = this.series[i].data.length, j;
@@ -230,17 +205,16 @@ var Chart = Class.extend({
 			if(adder < .01) {adder = .01; }
 			this.opt.animate += adder;
 		}
-		
 		//CLEAR
 		this.ctx.clearRect(0, 0, this.opt.cw, this.opt.ch);
 		//TITLE
 		this.ctx.textAlign = "center";
 		this.ctx.font = "14pt 'Calibri' bold";
 		this.ctx.fillStyle = "#333";
-		this.ctx.fillText(this.opt.title, this.opt.cw/2, 15);	//TITLE
+		this.ctx.fillText(this.opt.title, this.opt.cw/2, 15);		//SUBTITLE
 		this.ctx.font = "10pt 'Calibri'";
 		this.ctx.fillStyle = "#666";
-		this.ctx.fillText(this.opt.subtitle, this.opt.cw/2, 28);	//SUBTITLE
+		this.ctx.fillText(this.opt.subtitle, this.opt.cw/2, 28);
 	},
 	mouseOver: function(){
 		if(typeof(this.mtrack) !== "object") {
@@ -257,7 +231,7 @@ var Chart = Class.extend({
 		}
 	},
 	sortBySeries: function() {
-		//FOR AREA, RE-SORT SERIES BY SERIES TOTALS
+		//FOR AREA OR STREAMGRAPH RE-SORT SERIES BY SERIES TOTALS
 		var tst = this.opt.seriesTotals.slice();
 		var ser = tst.length, i;
 		var skeys = {};
@@ -281,17 +255,15 @@ var Chart = Class.extend({
 		this.ctx.lineTo(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.ch-this.opt.marginY-(this.opt.labelspace*this.opt.categories_on_bottom));
 		this.ctx.lineTo(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+this.opt.titlespace);
 		this.ctx.stroke();
-		
 		//CLEAR RECT BEHIND AXES
 		this.ctx.clearRect(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.ch-this.opt.marginY-(this.opt.labelspace*this.opt.categories_on_bottom)+1, this.opt.cw - this.opt.marginX - (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+(this.opt.labelspace*this.opt.categories_on_bottom)-1);
-		
 		//DRAW LABELS
 		this.ctx.font = "10pt 'Calibri'";
 		this.ctx.fillStyle = "#666";
 		this.ctx.textAlign = "center";
-		this.ctx.fillText(this.catAx.title, this.opt.cw/2, this.opt.ch-5);	//X AXIS
+		this.ctx.fillText(this.catAx.title, this.opt.cw/2, this.opt.ch-5);		//X AXIS
 		this.ctx.rotate(-Math.PI/2);
-		this.ctx.fillText(this.metAx.title, -this.opt.ch/2, 10);	//Y AXIS
+		this.ctx.fillText(this.metAx.title, -this.opt.ch/2, 10);		//Y AXIS
 		this.ctx.rotate(Math.PI/2);
 		if(this.opt.categories_on_side + this.opt.categories_on_bottom > 0) {
 			//ITEM LABELS
@@ -324,22 +296,16 @@ var Chart = Class.extend({
 var Pie = Chart.extend({
 	init: function(canvas_name, options){
 		if(!this.interval) {
-		
-			//CHANGE MAXIGAP
-			if(typeof(options.params.maxigap) !== "number") {
-				options.params.maxigap = 3;
-			}
-			
 			//CALL PARENT
 			this._super( canvas_name, options );
 			
 			//SETTINGS SPECIFIC TO PIE CHARTS
-			this.opt.c = [0, (this.opt.ch+this.opt.titlespace)/2];
-			this.opt.r = ((this.opt.cw/2)-(this.opt.margin*1.75))/this.series.length - (this.opt.margin*(this.series.length-1)/2);
+			this.opt.c = [0, (this.opt.ch+this.opt.titlespace)/2];   //the centerpoint of the first pie
+			this.opt.r = ((this.opt.cw/2)-(this.opt.margin*1.75))/this.series.length - (this.opt.margin*(this.series.length-1)/2);   //radius
 			if(this.opt.r > this.opt.c[1]-this.opt.margin) {
 				this.opt.r = this.opt.c[1]-(this.opt.margin*1.75);
 			}
-			this.opt.increment = Math.PI/50;
+			this.opt.increment = Math.PI/50;		//100 vertices
 			
 			//PRE-CALCULATE GRADIENTS
 			this.gradients = {shadow:[], main:[], highlight:[]};
@@ -351,24 +317,21 @@ var Pie = Chart.extend({
 				this.gradients.main[i] = [];
 				this.gradients.highlight[i] = [];
 				
-				//SET DEFAULT TO ROYGBIV COLOR PALLETTE
-				this.pal_id = 1;
-				
 				for(j=0; j<dlen; j++) {
 					//SHADOW GRADIENTS
 					this.gradients.shadow[i][j] = [];
 					this.gradients.shadow[i][j][0] = this.ctx.createRadialGradient(this.opt.c[0]-this.opt.r/2,this.opt.c[1]-this.opt.r/2,10,this.opt.c[0]-this.opt.r/2,this.opt.c[1]-this.opt.r/2,this.opt.r*1.5);
-					this.gradients.shadow[i][j][0].addColorStop(0,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.6, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.6, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.6, 0) +',1)');
-					this.gradients.shadow[i][j][0].addColorStop(1,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.6, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.6, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.6, 0) +',1)');
+					this.gradients.shadow[i][j][0].addColorStop(0,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.6, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.6, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.6, 0) +',1)');
+					this.gradients.shadow[i][j][0].addColorStop(1,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.6, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.6, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.6, 0) +',1)');
 					this.gradients.shadow[i][j][1]= this.ctx.createRadialGradient(this.opt.c[0]-this.opt.r/2,this.opt.c[1]-this.opt.r/2,10,this.opt.c[0]-this.opt.r/2,this.opt.c[1]-this.opt.r/2,this.opt.r*1.5);
-					this.gradients.shadow[i][j][1].addColorStop(0,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.5, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.5, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.5, 0) +',1)');
-					this.gradients.shadow[i][j][1].addColorStop(1,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.5, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.5, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.5, 0) +',1)');
+					this.gradients.shadow[i][j][1].addColorStop(0,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.5, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.5, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.5, 0) +',1)');
+					this.gradients.shadow[i][j][1].addColorStop(1,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.5, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.5, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.5, 0) +',1)');
 					//MAIN GRADIENT
 					this.gradients.main[i][j] = this.ctx.createRadialGradient(this.opt.c[0]-this.opt.r/3,this.opt.c[1]-this.opt.r/1.5,10,this.opt.c[0]-this.opt.r/3,this.opt.c[1]-this.opt.r/1.5,this.opt.r*1.65);
-					this.gradients.main[i][j].addColorStop(0,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*1.1, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*1.1, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*1.1, 0) +',1)');
-					this.gradients.main[i][j].addColorStop(0.2,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.97, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.97, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.97, 0) +',1)');
-					this.gradients.main[i][j].addColorStop(0.9,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.8, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.8, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.8, 0) +',1)');
-					this.gradients.main[i][j].addColorStop(1,'rgba(' + Math.round(this.pal[this.pal_id][j][0]*0.7, 0) +',' + Math.round(this.pal[this.pal_id][j][1]*0.7, 0) +',' + Math.round(this.pal[this.pal_id][j][2]*0.7, 0) +',0.99)');
+					this.gradients.main[i][j].addColorStop(0,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*1.1, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*1.1, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*1.1, 0) +',1)');
+					this.gradients.main[i][j].addColorStop(0.2,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.97, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.97, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.97, 0) +',1)');
+					this.gradients.main[i][j].addColorStop(0.9,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.8, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.8, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.8, 0) +',1)');
+					this.gradients.main[i][j].addColorStop(1,'rgba(' + Math.round(this.pal[this.opt.pal_id][j][0]*0.7, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][1]*0.7, 0) +',' + Math.round(this.pal[this.opt.pal_id][j][2]*0.7, 0) +',0.99)');
 					//HIGHLIGHT GRADIENT
 					this.gradients.highlight[i][j] = this.ctx.createRadialGradient(this.opt.c[0], this.opt.c[1]-this.opt.r*4, this.opt.r*3,this.opt.c[0],this.opt.c[1]-this.opt.r*3,(this.opt.r*4.1));
 					this.gradients.highlight[i][j].addColorStop(0,'rgba(255,255,255,0)');
@@ -388,7 +351,7 @@ var Pie = Chart.extend({
 		this._super();
 		
 		// Draw Pie-Specific Stuff
-		var sh_an = this.opt.shadow*this.opt.animate_2;
+		var sh_an = this.opt.three_d*this.opt.animate_2;
 		var serlen = this.series.length, i;
 		
 		//DRAW EACH PIECE OF PIE
@@ -410,7 +373,7 @@ var Pie = Chart.extend({
 					if((theta+t_theta)%Math.PI > Math.PI*0.75 || (theta+t_theta)%Math.PI < Math.PI*0.25) {
 						this.ctx.fillStyle = this.gradients.shadow[i][j][1];
 					}
-					this.ctx.shadowBlur    = 8;
+					this.ctx.shadowBlur    = this.opt.shadow;
 					this.ctx.shadowColor   = 'rgba(0,0,0,0.3)';
 					
 					//FIRST RECT
@@ -562,13 +525,11 @@ var Bar = Chart.extend({
 		if(!this.interval) {
 			options.params.categories_on_side = 1;
 			options.params.categories_on_bottom=0;
-			
-			
 			this._super( canvas_name, options );
 			
 			//INITIALIZE BAR STUFF
 			this.opt.cw_w = this.opt.cw-(this.opt.marginX*2)-this.opt.labelspace;
-			this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace-this.opt.shadow;
+			this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace-this.opt.three_d;
 			
 			var _this = this;
 			
@@ -615,18 +576,18 @@ var Bar = Chart.extend({
 				}
 				
 				this.ctx.fillStyle = this.series[i].color;
-				this.ctx.shadowBlur    = 8;
+				this.ctx.shadowBlur    = this.opt.shadow;
 				this.ctx.shadowColor   = 'rgba(0,0,0,0.2)';
 				//MAIN COLORBOX (SHADOW + BOX)
 				this.ctx.beginPath();
 				this.ctx.moveTo(x, y);
 				if(this.opt.stack) {
 					this.ctx.lineTo(x, y+h);
-					this.ctx.lineTo(x-this.opt.shadow, y+h+this.opt.shadow);
+					this.ctx.lineTo(x-this.opt.three_d, y+h+this.opt.three_d);
 				} else {
-					this.ctx.lineTo(x, y+h+this.opt.shadow);
+					this.ctx.lineTo(x, y+h+this.opt.three_d);
 				}
-				this.ctx.lineTo(x+w-this.opt.minigap, y+h+this.opt.shadow);
+				this.ctx.lineTo(x+w-this.opt.minigap, y+h+this.opt.three_d);
 				this.ctx.lineTo(x+w, y+h);
 				this.ctx.lineTo(x+w, y);
 				this.ctx.fill();
@@ -638,11 +599,11 @@ var Bar = Chart.extend({
 				this.ctx.moveTo(x, y+h);
 				if(this.opt.stack){
 					this.ctx.lineTo(x, y+h);
-					this.ctx.lineTo(x-this.opt.shadow, y+h+this.opt.shadow);
+					this.ctx.lineTo(x-this.opt.three_d, y+h+this.opt.three_d);
 				} else {
-					this.ctx.lineTo(x, y+h+this.opt.shadow);
+					this.ctx.lineTo(x, y+h+this.opt.three_d);
 				}
-				this.ctx.lineTo(x+w-this.opt.minigap, y+h+this.opt.shadow);
+				this.ctx.lineTo(x+w-this.opt.minigap, y+h+this.opt.three_d);
 				this.ctx.lineTo(x+w, y+h);
 				this.ctx.fill();
 				
@@ -682,7 +643,7 @@ var Bar = Chart.extend({
 						this.ctx.textAlign = "left";
 						pd = 5;
 					}
-					this.ctx.fillText(stv, x+w+pd, y+h-1);	
+					this.ctx.fillText(stv, x+w+pd, y+h-1);
 				}
 			}
 		}
@@ -698,9 +659,9 @@ var Column = Chart.extend({
 			options.params.categories_on_side = 0;
 			options.params.categories_on_bottom=1;
 			this._super( canvas_name, options );
-			//INITIALIZE COLUMN STUFF
 			
-			this.opt.cw_w = this.opt.cw-(this.opt.marginX*2)-this.opt.shadow;
+			//INITIALIZE COLUMN STUFF
+			this.opt.cw_w = this.opt.cw-(this.opt.marginX*2)-this.opt.three_d;
 			this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace - this.opt.labelspace;
 			
 			var _this = this;
@@ -721,12 +682,10 @@ var Column = Chart.extend({
 			var serspace = this.opt.cw_w/ind_len;
 			for(j=0; j<ind_len; j++) {
 				stackX[j] = stackX[j] || 0;
-				
 				var x = this.opt.marginX + this.opt.minigap + (j*serspace) + ((1-this.opt.stack)*(i*((serspace-this.opt.maxigap)/tot_len)));
 				var y = this.opt.ch - this.opt.marginY - this.opt.labelspace - (this.opt.stack*stackX[j]);
 				var h =  this.opt.ch_w *(this.series[i].data[j]/((this.opt.max*((this.opt.stack+1)%2)) + (this.opt.cmax*(this.opt.stack)))) * this.opt.animate;
 				var w = ((serspace-this.opt.maxigap)/((tot_len*((this.opt.stack+1)%2))+(1*this.opt.stack)))-this.opt.minigap;
-				
 				stackX[j] += h + this.opt.stack;
 				
 				//BG Highlight
@@ -742,7 +701,7 @@ var Column = Chart.extend({
 					this.ctx.fill();
 				}
 				this.ctx.fillStyle = this.series[i].color;
-				this.ctx.shadowBlur    = 8;
+				this.ctx.shadowBlur    = this.opt.shadow;
 				this.ctx.shadowColor   = 'rgba(0,0,0,0.2)';
 				
 				//MAIN COLORBOX (SHADOW + BOX)
@@ -750,8 +709,8 @@ var Column = Chart.extend({
 				this.ctx.moveTo(x, y);
 				this.ctx.lineTo(x, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap, y-h);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.shadow, y-h+this.opt.shadow);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.shadow, y+this.opt.shadow);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y-h+this.opt.three_d);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y+this.opt.three_d);
 				this.ctx.lineTo(x+w-this.opt.minigap, y);
 				this.ctx.fill();
 				this.ctx.shadowColor = 'rgba(0,0,0,0)';
@@ -760,8 +719,8 @@ var Column = Chart.extend({
 				this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
 				this.ctx.beginPath();
 				this.ctx.moveTo(x+w-this.opt.minigap, y-h);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.shadow, y-h+this.opt.shadow);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.shadow, y+this.opt.shadow);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y-h+this.opt.three_d);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y+this.opt.three_d);
 				this.ctx.lineTo(x+w-this.opt.minigap, y);
 				this.ctx.fill();
 				
@@ -801,7 +760,7 @@ var Column = Chart.extend({
 						this.ctx.textAlign = "left";
 						pd = 5;
 					}
-					this.ctx.fillText(stv, x+w+pd, y+h-1);	
+					this.ctx.fillText(stv, x+w+pd, y+h-1);
 				}
 			}
 		}
@@ -818,14 +777,14 @@ var Line = Chart.extend({
 			this._super( canvas_name, options );
 
 			var _this = this;
-			//setTimeout(function() {_this.draw()}, time);
+			
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
 		}
 	},
 	draw: function(){
 		// Call the inherited version of draw()
 		this._super();
-		this.ctx.shadowBlur = Math.round(this.opt.animate_2*8);
+		this.ctx.shadowBlur = Math.round(this.opt.animate_2*this.opt.shadow);
 		this.ctx.shadowColor = 'rgba(0,0,0,0.2)';
 		this.ctx.lineWidth = Math.round(this.opt.animate_2*3)+1;
 		//DRAW LINE
@@ -834,7 +793,6 @@ var Line = Chart.extend({
 			var ind_len = this.series[i].data.length, j;
 			var serspace = this.opt.cw_w/ind_len;
 			this.ctx.strokeStyle = this.series[i].color;
-			
 			this.ctx.beginPath();
 			this.ctx.moveTo(this.opt.startX, this.opt.ch - this.opt.marginY - ((this.series[i].data[0]/this.opt.max)*this.opt.ch_w));
 			for(j=1; j<ind_len*this.opt.animate; j++) {
@@ -847,7 +805,8 @@ var Line = Chart.extend({
 			}
 			this.ctx.stroke();
 		}
-		this.ctx.shadowColor = 'rgba(0,0,0,0)';
+		this.ctx.shadowColor = 'rgba(0,0,0,0.0)';
+		this.ctx.shadowBlur = 0;
 		//DRAW AXES
 		this.drawAxes();
 		
@@ -882,7 +841,7 @@ var Area = Chart.extend({
 			this.ctx.strokeStyle = this.series[i].color;
 			this.ctx.fillStyle = 'rgba' + this.series[i].color.substr(3, this.series[i].color.length-4) + ", " + (1-((i/tot_len)/4)) + ')';
 			this.ctx.shadowColor = 'rgba(' + Math.round(getR(this.series[i].color)/2) + ', ' + Math.round(getG(this.series[i].color)/2) + ', ' + Math.round(getB(this.series[i].color)/2) + ', 0.2)';
-			this.ctx.shadowBlur = 15;
+			this.ctx.shadowBlur = this.opt.shadow*2;
 			this.ctx.beginPath();
 			this.ctx.lineWidth = 0;
 			this.ctx.moveTo(this.opt.startX, this.opt.ch-this.opt.marginY);
@@ -923,15 +882,10 @@ var Streamgraph = Chart.extend({
 			options.params.sort_by_series = 1;
 			
 			this._super( canvas_name, options );
-			
 			//GET MID-PT
-			this.opt.midpt = (this.opt.ch_w/2) + this.opt.titlespace + this.opt.marginY;
-
-			//IF NUMBER OF SERIES IS ODD, OFFSET MIDPOINT TO MAKE EVERYTHING FIT
-			
+			this.opt.midpt = (this.opt.ch_w/2) + this.opt.titlespace + this.opt.marginY;			
 			var _this = this;
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
-			//setTimeout(function() {_this.draw();}, 1000/30);
 		}
 	},
 	draw: function(){
@@ -942,33 +896,27 @@ var Streamgraph = Chart.extend({
 		this.ctx.lineWidth = 1;
 		//DRAW LINE
 		var stackAdd = [[],[]];
-
 		var tmax = this.opt.max;
 		if(this.opt.stack) {tmax = this.opt.cmax;}
 		
 		var tot_len = this.series.length, i;
 		for(i=0; i<tot_len; i++) {
 			this.ctx.shadowColor = 'rgba(0,0,0,0)';
-			
 			this.ctx.strokeStyle = this.series[i].color;
 			var trans = 1;
 			if(!this.opt.stack) { trans = (1-((i/tot_len)/4)); }
 			this.ctx.fillStyle = 'rgba' + this.series[i].color.substr(3, this.series[i].color.length-4) + ", " + trans + ')';
 			this.ctx.shadowColor = 'rgba(' + Math.round(getR(this.series[i].color)/2) + ', ' + Math.round(getG(this.series[i].color)/2) + ', ' + Math.round(getB(this.series[i].color)/2) + ', 0.2)';
-			this.ctx.shadowBlur = 10;
+			this.ctx.shadowBlur = this.opt.shadow;
 			this.ctx.lineWidth = 1;
 			
 			//ALWAYS START AT MIDPOINT
 			this.ctx.beginPath();
 			this.ctx.moveTo(this.opt.startX, this.opt.midpt);
-			
-			
 			var divider = 1;
-
 			var ind_len = this.series[i].data.length;
 			//EVENS CURVE ON TOP
 			if(i%2 === 0 || i === tot_len-1) {
-				
 				var j;
 				for(j=0; j<Math.floor(ind_len*this.opt.animate); j++) {
 					if(this.opt.smooth) {
@@ -987,18 +935,15 @@ var Streamgraph = Chart.extend({
 				}
 			}
 			if(i === tot_len-1) {
-				
-				this.ctx.lineTo(this.opt.startX + ((this.opt.increment*ind_len)*this.opt.animate), this.opt.midpt);
+				this.ctx.lineTo(this.opt.startX + ((this.opt.increment*(ind_len+1))*this.opt.animate), this.opt.midpt);
 				this.ctx.fill();
 				this.ctx.shadowColor = 'rgba(' + Math.round(getR(this.series[i].color)/2) + ', ' + Math.round(getG(this.series[i].color)/2) + ', ' + Math.round(getB(this.series[i].color)/2) + ', 0.2)';
-				this.ctx.shadowBlur = 10;
-				
+				this.ctx.shadowBlur = this.opt.shadow;
 				this.ctx.beginPath();
 				this.ctx.moveTo(this.opt.startX, this.opt.midpt);
 			}
 			//ODDS AND FIRST CURVE ON BOTTOM
 			if(i%2 === 1 || i === tot_len-1) {
-				
 				var j;
 				for(j=0; j<Math.floor(ind_len*this.opt.animate); j++) {
 					if(this.opt.smooth) {
@@ -1016,7 +961,7 @@ var Streamgraph = Chart.extend({
 					}
 				}
 			}
-			this.ctx.lineTo(this.opt.startX + ((this.opt.increment*ind_len)*this.opt.animate), this.opt.midpt);
+			this.ctx.lineTo(this.opt.startX + ((this.opt.increment*(ind_len+1))*this.opt.animate), this.opt.midpt);
 			this.ctx.fill();
 			this.ctx.stroke();
 		}
