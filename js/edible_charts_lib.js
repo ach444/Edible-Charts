@@ -572,6 +572,9 @@ var Pie = Chart.extend({
 				this.ctx.textAlign = 'center';
 				this.ctx.font = "10pt 'Calibri' bold";
 				this.ctx.fillText(this.series[i].name + " by " + this.catAx.title, ((this.opt.cw/serlen)*j) + ((this.opt.cw/serlen)/2), this.opt.ch-10);
+				
+				//SPIN TAB
+				
 			}
 		}
 	}

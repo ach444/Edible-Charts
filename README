@@ -4,9 +4,8 @@ CHART FUNCTIONALITY TODO LIST:
 		
 		General Functionality:
 		-Global Highlight/Hover helper
-		-Global Universal Start/End Transitions
+		-Global Universal Start/End Transitions: Basically, we want to have every chart type and style start from a common shape, this way, chart switching will be smoooth and beautiful.
 		-Global "switching" menu (e.g.: go from pie to area to trend one value...)
-		-DEFAULT SETTING DOESNT ALLOW FOR PASSING OF ZERO VALUE
 		
 		Existing Chart Types:
 		PIE:
@@ -15,14 +14,20 @@ CHART FUNCTIONALITY TODO LIST:
 			-Develop Spin functionality (for fun!)
 			
 		Bar/Column:
-			-Draw in Metrics
-			-Use clearRect to prevent overflow DONE
-			-Bar Shadow at higher angle
-			-Blur on Bar
+			-Legend to indicate categories of colors
 			-Switch Column axes labels
 			
-		New Chart Types:
 		Area (stack/non-stack)
+			-Legend to indicate categories of colors
+			-Switch Column axes labels
+			
 		Line
+			-Legend to indicate categories of colors
+			-Switch Column axes labels
+			
 		Streamgraph
+			-Smoothing
+			-Custom tickmarks
+			
 		Bubble
+			-NOT YET DEVELOPED
