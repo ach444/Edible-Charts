@@ -37,6 +37,7 @@ var Chart = Class.extend({
 		this.opt.minigap = this.opt.minigap || 2;		//gap between grouped bars or columns
 		this.opt.maxigap = this.opt.maxigap || 10;	//gap between pie slices, bar or column groups, etc...
 		this.opt.three_d = this.opt.three_d || 4;		//"3Dness" (depth) of a chart, when available
+		if(this.opt.three_d > this.opt.maxigap){ this.opt.three_d = this.opt.maxigap-1; }
 		this.opt.shadow = this.opt.shadow || 10;		//blurry dropshadow drawn behind certain shapes
 		this.opt.sort = this.opt.sort || -1;		//if set, the nth category is sorted, and everything else follows
 		this.opt.stack = this.opt.stack || 0;		//set to 1 means chart will try to be stacked (area, bar, column, streamgraph)
@@ -52,9 +53,9 @@ var Chart = Class.extend({
 			[[40,40,40], [110,110,110], [170,170,170], [70,70,70], [140,140,140]]
 			];
 		this.opt.pal_id = 1;		//default to the second (above) palette feat. 8 colors, later add in more colors and smart palette choosing
-		this.opt.cw_w = this.opt.cw-(this.opt.marginX*2);   //available horizontal working area
+		this.opt.cw_w = this.opt.cw-(this.opt.marginX*2)-15;   //available horizontal working area
 		this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace-this.opt.three_d;   //available vertical working area
-		this.opt.startX = this.opt.marginX + 5;		//where to start X
+		this.opt.startX = this.opt.marginX;		//where to start X
 		this.opt.smooth = this.opt.smooth || 0;		//smoothing is available for line, area, and streamgraphs (see below)
 		
 		//SET MAX/MINS
@@ -146,7 +147,7 @@ var Chart = Class.extend({
 		if(this.opt.sort_by_series && !this.opt.stack) { this.sortBySeries();}
 		
 		//SMOOTHING STUFF
-		this.opt.increment = this.opt.cw_w/(this.opt.seriesMax+1);
+		this.opt.increment = this.opt.cw_w/(this.opt.seriesMax-1);
 		this.opt.smooth_amount = this.opt.smooth_amount || 4;
 		if(this.opt.smooth_amount < 2) {this.opt.smooth_amount = 2;}
 		
@@ -182,6 +183,24 @@ var Chart = Class.extend({
 					prevY = y
 				}
 			}
+		}
+		
+		//CALCULATE METRIC TICKS
+		var tmax = this.opt.max;
+		if(this.opt.stack){ tmax = this.opt.cmax;}
+		
+		this.opt.tick_spacing = 0;
+		var minimum = tmax / 5;
+	    var magnitude = Math.pow(10, Math.floor(Math.log(minimum) / Math.log(10)));
+	    var residual = minimum / magnitude;
+	    if (residual > 5){
+	        this.opt.tick_spacing = 10 * magnitude;
+		} else if (residual > 2){
+	        this.opt.tick_spacing = 5 * magnitude;
+		} else if (residual > 1){
+	        this.opt.tick_spacing = 2 * magnitude;
+		} else {
+	        this.opt.tick_spacing = magnitude;
 		}
 		
 		//MOUSE TRACKING SETUP
@@ -245,6 +264,42 @@ var Chart = Class.extend({
 			this.series[i] = tmp[skeys[tst[i]]];
 		}
 	},
+	drawGridlines: function() {	
+     	this.ctx.lineWidth = 1;
+     	this.ctx.strokeStyle = "rgba(120,120,120,0.6)";
+		var tmax = this.opt.max;
+		if(this.opt.stack) {tmax = this.opt.cmax;}
+     	//horizontal
+     	if(this.opt.categories_on_bottom || this.opt.horizontal_ticks) {
+           	var i;
+           	for(i=0; i<5; i++) {
+				var tval = (i+1)*this.opt.tick_spacing;
+               	this.ctx.beginPath();
+               	this.ctx.moveTo(this.opt.startX, this.opt.titlespace + this.opt.marginY + this.opt.ch_w - (this.opt.ch_w * (tval/tmax)));
+               	this.ctx.lineTo(this.opt.cw-this.opt.marginX,  this.opt.titlespace + this.opt.marginY + this.opt.ch_w - (this.opt.ch_w * (tval/tmax)));
+               	this.ctx.stroke();
+				this.ctx.font = "10pt 'Calibri'";
+				this.ctx.fillStyle = "#999";
+				this.ctx.fillText(tval, this.opt.cw-this.opt.marginX, this.opt.titlespace + this.opt.marginY + this.opt.ch_w - (this.opt.ch_w * (tval/tmax))-2);
+           	}
+     	}
+		//vertical
+		else if(this.opt.categories_on_side || this.opt.vertical_ticks) {
+           	var i;
+           	for(i=0; i<5; i++) {
+				var tval = (i+1)*this.opt.tick_spacing;
+               	this.ctx.beginPath();
+               	this.ctx.moveTo(this.opt.startX + this.opt.labelspace + (this.opt.cw_w * (tval/tmax)), this.opt.titlespace + this.opt.marginY);
+               	this.ctx.lineTo(this.opt.startX + this.opt.labelspace + (this.opt.cw_w * (tval/tmax)), this.opt.titlespace + this.opt.marginY + this.opt.ch_w);
+               	this.ctx.stroke();
+				this.ctx.font = "10pt 'Calibri'";
+				this.ctx.textBaseline = "top";
+				this.ctx.fillStyle = "#666";
+				this.ctx.fillText(tval, this.opt.startX + this.opt.labelspace + (this.opt.cw_w * (tval/tmax)), this.opt.titlespace + this.opt.marginY + this.opt.ch_w+3);
+				this.ctx.textBaseline = "alphabetic";
+           	}
+     	}
+	},
 	drawAxes: function() {
 		//DRAW AXES
 		this.ctx.textAlign = "start";
@@ -256,7 +311,7 @@ var Chart = Class.extend({
 		this.ctx.lineTo(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+this.opt.titlespace);
 		this.ctx.stroke();
 		//CLEAR RECT BEHIND AXES
-		this.ctx.clearRect(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.ch-this.opt.marginY-(this.opt.labelspace*this.opt.categories_on_bottom)+1, this.opt.cw - this.opt.marginX - (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+(this.opt.labelspace*this.opt.categories_on_bottom)-1);
+		//this.ctx.clearRect(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.ch-this.opt.marginY-(this.opt.labelspace*this.opt.categories_on_bottom)+1, this.opt.cw - this.opt.marginX - (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+(this.opt.labelspace*this.opt.categories_on_bottom)-1);
 		//DRAW LABELS
 		this.ctx.font = "10pt 'Calibri'";
 		this.ctx.fillStyle = "#666";
@@ -339,7 +394,8 @@ var Pie = Chart.extend({
 					this.gradients.highlight[i][j].addColorStop(0.405,'rgba(255,255,255,0.0)');
 				}
 			}
-			
+			//MAXIGAP SHOULD BE REDUCED FOR PIE CHARTS
+			this.opt.maxigap = this.opt.maxigap/2;
 			var _this = this;
 			
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
@@ -359,6 +415,7 @@ var Pie = Chart.extend({
 			var theta = 0;
 			var div = this.opt.seriesTotals[i]/(Math.PI*2);
 			this.opt.c[0] = -(this.opt.r+this.opt.margin) + (((this.opt.r*2) + (this.opt.margin*2))*(1+i));
+			if(serlen === 1) { this.opt.c[0] = this.opt.cw/2; }
 			var cen_an = [this.opt.c[0]-sh_an/2, this.opt.c[1]-sh_an];
 			var dlen = this.series[i].data.length, j;
 			if(this.opt.animate_2 > 0) {
@@ -539,7 +596,8 @@ var Bar = Chart.extend({
 	draw: function(){
 		// Call the inherited version of draw()
 		this._super();
-		
+		//METRICS
+		this.drawGridlines();
 		//DRAW BAR/COLUMN STUFF
 		var active = [];
 		var stackX = [];
@@ -562,22 +620,10 @@ var Bar = Chart.extend({
 				var h = ((serspace-this.opt.maxigap)/((tot_len*((this.opt.stack+1)%2))+(1*this.opt.stack)))-this.opt.minigap;
 				stackX[j] += w + this.opt.stack;
 				
-				//BG Highlight
-				if(i===0 && typeof(this.mtrack) === "object" && active[j] === 1) {
-					this.ctx.fillStyle = 'rgba(0,0,0,.1)';
-					this.ctx.beginPath();
-					this.ctx.moveTo(x-(this.opt.maxigap/2), y-(this.opt.maxigap/2));
-					this.ctx.lineTo(x-(this.opt.maxigap/2)-this.opt.labelspace, y-(this.opt.maxigap/2)+this.opt.labelspace);
-					this.ctx.lineTo(x-(this.opt.maxigap/2)-this.opt.labelspace+(serspace*0.5), y-(this.opt.maxigap/2)+this.opt.labelspace+(serspace*0.5));
-					this.ctx.lineTo(x-(this.opt.maxigap/2)+serspace, y-(this.opt.maxigap/2)+serspace);
-					this.ctx.lineTo(this.opt.cw-this.opt.marginX, y+serspace-(this.opt.maxigap/2));
-					this.ctx.lineTo(this.opt.cw-this.opt.marginX, y-(this.opt.maxigap/2));
-					this.ctx.fill();
-				}
-				
 				this.ctx.fillStyle = this.series[i].color;
 				this.ctx.shadowBlur    = this.opt.shadow;
 				this.ctx.shadowColor   = 'rgba(0,0,0,0.2)';
+				this.ctx.globalAlpha = 0.91;
 				//MAIN COLORBOX (SHADOW + BOX)
 				this.ctx.beginPath();
 				this.ctx.moveTo(x, y);
@@ -592,7 +638,7 @@ var Bar = Chart.extend({
 				this.ctx.lineTo(x+w, y);
 				this.ctx.fill();
 				this.ctx.shadowColor = 'rgba(0,0,0,0)';
-				
+				this.ctx.globalAlpha = 1;
 				//GRADIENT SHADOW
 				this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
 				this.ctx.beginPath();
@@ -672,7 +718,7 @@ var Column = Chart.extend({
 	draw: function(){
 		// Call the inherited version of draw()
 		this._super();
-		
+		this.drawGridlines();
 		//DRAW COLUMN STUFF
 		var active = [];
 		var stackX = [];
@@ -688,19 +734,8 @@ var Column = Chart.extend({
 				var w = ((serspace-this.opt.maxigap)/((tot_len*((this.opt.stack+1)%2))+(1*this.opt.stack)))-this.opt.minigap;
 				stackX[j] += h + this.opt.stack;
 				
-				//BG Highlight
-				if(i===0 && typeof(this.mtrack) === "object" && active[j] === 1) {
-					this.ctx.fillStyle = 'rgba(0,0,0,.1)';
-					this.ctx.beginPath();
-					this.ctx.moveTo(x-(this.opt.maxigap/2), y-(this.opt.maxigap/2));
-					this.ctx.lineTo(x-(this.opt.maxigap/2)-this.opt.labelspace, y-(this.opt.maxigap/2)+this.opt.labelspace);
-					this.ctx.lineTo(x-(this.opt.maxigap/2)-this.opt.labelspace+(serspace*0.5), y-(this.opt.maxigap/2)+this.opt.labelspace+(serspace*0.5));
-					this.ctx.lineTo(x-(this.opt.maxigap/2)+serspace, y-(this.opt.maxigap/2)+serspace);
-					this.ctx.lineTo(this.opt.cw-this.opt.marginX, y+serspace-(this.opt.maxigap/2));
-					this.ctx.lineTo(this.opt.cw-this.opt.marginX, y-(this.opt.maxigap/2));
-					this.ctx.fill();
-				}
 				this.ctx.fillStyle = this.series[i].color;
+				this.ctx.globalAlpha = 0.91;
 				this.ctx.shadowBlur    = this.opt.shadow;
 				this.ctx.shadowColor   = 'rgba(0,0,0,0.2)';
 				
@@ -715,6 +750,8 @@ var Column = Chart.extend({
 				this.ctx.fill();
 				this.ctx.shadowColor = 'rgba(0,0,0,0)';
 				
+				this.ctx.globalAlpha = 1;
+				
 				//GRADIENT SHADOW
 				this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
 				this.ctx.beginPath();
@@ -727,11 +764,11 @@ var Column = Chart.extend({
 				//MAIN SHADOW
 				var r2 = Math.sqrt((h*h) + ((w+h)*(w+h)));
 				var cstop = h/(r2-w);
-				tgrad = this.ctx.createRadialGradient(x-h,y-h-h,h,x-h,y-h-h,r2);
+				tgrad = this.ctx.createRadialGradient(x-h,y-h,h,x-h,y-h,r2);
 				tgrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
 				tgrad.addColorStop(cstop, 'rgba(255, 255, 255, 0)');
 				tgrad.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
-				tgrad.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+				tgrad.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
 				this.ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
 				this.ctx.lineWidth = 1;
 				this.ctx.fillStyle = tgrad;
@@ -774,16 +811,17 @@ var Line = Chart.extend({
 		if(!this.interval) {
 			options.params.categories_on_side = 0;
 			options.params.categories_on_bottom=0;
+			options.params.horizontal_ticks = 1;
 			this._super( canvas_name, options );
-
 			var _this = this;
-			
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
 		}
 	},
 	draw: function(){
 		// Call the inherited version of draw()
 		this._super();
+		//METRICS
+		this.drawGridlines();
 		this.ctx.shadowBlur = Math.round(this.opt.animate_2*this.opt.shadow);
 		this.ctx.shadowColor = 'rgba(0,0,0,0.2)';
 		this.ctx.lineWidth = Math.round(this.opt.animate_2*3)+1;
@@ -791,7 +829,6 @@ var Line = Chart.extend({
 		var tot_len = this.series.length, i;
 		for(i=0; i<tot_len; i++) {
 			var ind_len = this.series[i].data.length, j;
-			var serspace = this.opt.cw_w/ind_len;
 			this.ctx.strokeStyle = this.series[i].color;
 			this.ctx.beginPath();
 			this.ctx.moveTo(this.opt.startX, this.opt.ch - this.opt.marginY - ((this.series[i].data[0]/this.opt.max)*this.opt.ch_w));
@@ -800,7 +837,7 @@ var Line = Chart.extend({
 					//bezierCurveTo(2ND BEZ PT X OF LAST COORD, 2ND BEZ PT Y OF LAST COORD, 1ST BEZ PT X OF THIS COORD, 1ST BEZ PT Y OF THIS COORD, THIS COORD X, THIS COORD Y)
 					this.ctx.bezierCurveTo(this.series[i].calc[j-1][4], this.series[i].calc[j-1][5], this.series[i].calc[j][0], this.series[i].calc[j][1], this.series[i].calc[j][2], this.series[i].calc[j][3]);
 				} else {
-					this.ctx.lineTo(this.opt.startX + (serspace*j), this.opt.ch - this.opt.marginY - ((this.series[i].data[j]/this.opt.max)*this.opt.ch_w));
+					this.ctx.lineTo(this.opt.startX + (this.opt.increment*j), this.opt.ch - this.opt.marginY - ((this.series[i].data[j]/this.opt.max)*this.opt.ch_w));
 				}
 			}
 			this.ctx.stroke();
@@ -809,7 +846,6 @@ var Line = Chart.extend({
 		this.ctx.shadowBlur = 0;
 		//DRAW AXES
 		this.drawAxes();
-		
 	}
 });
 
@@ -818,8 +854,10 @@ var Area = Chart.extend({
 		if(!this.interval) {
 			options.params.categories_on_side = 0;
 			options.params.categories_on_bottom=0;
+			options.params.horizontal_ticks = 1;
 			options.params.sort_by_series = 1;
 			this._super( canvas_name, options );
+			
 			var _this = this;
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
 		}
@@ -827,6 +865,8 @@ var Area = Chart.extend({
 	draw: function(){
 		// Call the inherited version of draw()
 		this._super();
+		//METRICS
+		this.drawGridlines();
 		//DRAW AREA-SPECIFIC ELEMENTS
 		this.ctx.lineWidth = 1;
 		//DRAW LINE
@@ -848,7 +888,6 @@ var Area = Chart.extend({
 			this.ctx.lineTo(this.opt.startX, this.opt.ch - this.opt.marginY - ((((this.opt.categoryTotals[0] - stackAdd[0] - this.series[i].data[0])/tmax)* this.opt.ch_w)*this.opt.stack) - ((this.series[i].data[0] / tmax) * this.opt.ch_w));
 			this.ctx.lineWidth = 1;
 			var calcmax = this.opt.ch_w;
-			
 			for(j=1; j<Math.floor(ind_len*this.opt.animate); j++) {
 				if(this.opt.smooth) {
 					//bezierCurveTo(2ND BEZ PT X OF LAST COORD, 2ND BEZ PT Y OF LAST COORD, 1ST BEZ PT X OF THIS COORD, 1ST BEZ PT Y OF THIS COORD, THIS COORD X, THIS COORD Y)
@@ -856,7 +895,7 @@ var Area = Chart.extend({
 				} else {
 					stackAdd[j] = stackAdd[j] || 0;
 					var ty = this.opt.ch - this.opt.marginY - ((((this.opt.categoryTotals[j] - stackAdd[j] - this.series[i].data[j])/tmax)* this.opt.ch_w)*this.opt.stack) - ((this.series[i].data[j] / tmax) * this.opt.ch_w);
-					this.ctx.lineTo(this.opt.startX + (this.opt.increment*j-1) + (this.opt.increment*this.opt.animate), ty);
+					this.ctx.lineTo(this.opt.startX + (this.opt.increment*(j-1)) + (this.opt.increment*this.opt.animate), ty);
 					if(this.opt.stack) { stackAdd[j] += this.series[i].data[j];}
 				}
 			}
@@ -878,12 +917,14 @@ var Streamgraph = Chart.extend({
 	init: function(canvas_name, options){
 		if(!this.interval) {
 			options.params.categories_on_side = 0;
-			options.params.categories_on_bottom=0;
+			options.params.categories_on_bottom = 0;
+			options.params.horizontal_ticks = 1;
 			options.params.sort_by_series = 1;
 			
 			this._super( canvas_name, options );
 			//GET MID-PT
-			this.opt.midpt = (this.opt.ch_w/2) + this.opt.titlespace + this.opt.marginY;			
+			this.opt.midpt = (this.opt.ch_w/2) + this.opt.titlespace + this.opt.marginY;			this.opt.increment = this.opt.cw_w/(this.opt.seriesMax+1);
+			
 			var _this = this;
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
 		}
@@ -891,7 +932,8 @@ var Streamgraph = Chart.extend({
 	draw: function(){
 		// Call the inherited version of draw()
 		this._super();
-		
+		//METRICS
+		this.drawGridlines();
 		//DRAW AREA-SPECIFIC ELEMENTS
 		this.ctx.lineWidth = 1;
 		//DRAW LINE
