@@ -598,7 +598,7 @@ var Bar = Chart.extend({
 		this._super();
 		//METRICS
 		this.drawGridlines();
-		//DRAW BAR/COLUMN STUFF
+		//DRAW BAR STUFF
 		var active = [];
 		var stackX = [];
 		var tot_len = this.series.length, i;
@@ -745,7 +745,7 @@ var Column = Chart.extend({
 				this.ctx.lineTo(x, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y-h+this.opt.three_d);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y+this.opt.three_d);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y);
 				this.ctx.lineTo(x+w-this.opt.minigap, y);
 				this.ctx.fill();
 				this.ctx.shadowColor = 'rgba(0,0,0,0)';
