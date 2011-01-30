@@ -757,7 +757,7 @@ var Column = Chart.extend({
 				this.ctx.beginPath();
 				this.ctx.moveTo(x+w-this.opt.minigap, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y-h+this.opt.three_d);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y+this.opt.three_d);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y);
 				this.ctx.lineTo(x+w-this.opt.minigap, y);
 				this.ctx.fill();
 				
