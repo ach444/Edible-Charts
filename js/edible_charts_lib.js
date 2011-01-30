@@ -737,6 +737,11 @@ var Column = Chart.extend({
 				var w = ((serspace-this.opt.maxigap)/((tot_len*((this.opt.stack+1)%2))+(1*this.opt.stack)))-this.opt.minigap;
 				stackX[j] += h + this.opt.stack;
 				
+				var hanging = 0;
+				if(i>0 && this.opt.stack) {
+					hanging = this.opt.three_d;
+				}
+				
 				this.ctx.fillStyle = this.series[i].color;
 				this.ctx.globalAlpha = 0.91;
 				this.ctx.shadowBlur    = this.opt.shadow;
@@ -748,7 +753,7 @@ var Column = Chart.extend({
 				this.ctx.lineTo(x, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y-h+this.opt.three_d);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y+hanging);
 				this.ctx.lineTo(x+w-this.opt.minigap, y);
 				this.ctx.fill();
 				this.ctx.shadowColor = 'rgba(0,0,0,0)';
@@ -760,7 +765,7 @@ var Column = Chart.extend({
 				this.ctx.beginPath();
 				this.ctx.moveTo(x+w-this.opt.minigap, y-h);
 				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y-h+this.opt.three_d);
-				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y);
+				this.ctx.lineTo(x+w-this.opt.minigap+this.opt.three_d, y+hanging);
 				this.ctx.lineTo(x+w-this.opt.minigap, y);
 				this.ctx.fill();
 				
