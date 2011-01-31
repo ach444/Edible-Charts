@@ -50,9 +50,9 @@ var Chart = Class.extend({
 		this.pal = [
 			[[0, 160, 176], [106, 74, 60], [204, 51, 63], [235, 104, 65], [237, 201, 81], [100, 54, 132]],
 			[[131,104,213], [23,158,221], [143,215,39], [238,208,42], [246,154,32], [245,42,31], [120,118,121], [226,226,226]],
-			[[40,40,40], [110,110,110], [170,170,170], [70,70,70], [140,140,140]]
+			[[166, 206, 227], [31, 120, 180], [178, 223, 138], [51, 160, 44], [251, 154, 153], [227, 26, 28], [253, 191, 111], [255, 127, 0], [202, 178, 214], [106, 61, 154], [255, 255, 153]]
 			];
-		this.opt.pal_id = 1;		//default to the second (above) palette feat. 8 colors, later add in more colors and smart palette choosing
+		this.opt.pal_id = 2;		//default to the second (above) palette feat. 8 colors, later add in more colors and smart palette choosing
 		this.opt.cw_w = this.opt.cw-(this.opt.marginX*2)-15;   //available horizontal working area
 		this.opt.ch_w = this.opt.ch-(this.opt.marginY*2)-this.opt.titlespace-this.opt.three_d;   //available vertical working area
 		this.opt.startX = this.opt.marginX;		//where to start X
@@ -310,16 +310,17 @@ var Chart = Class.extend({
 		this.ctx.lineTo(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.ch-this.opt.marginY-(this.opt.labelspace*this.opt.categories_on_bottom));
 		this.ctx.lineTo(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+this.opt.titlespace);
 		this.ctx.stroke();
-		//CLEAR RECT BEHIND AXES
-		//this.ctx.clearRect(this.opt.marginX + (this.opt.labelspace*this.opt.categories_on_side), this.opt.ch-this.opt.marginY-(this.opt.labelspace*this.opt.categories_on_bottom)+1, this.opt.cw - this.opt.marginX - (this.opt.labelspace*this.opt.categories_on_side), this.opt.marginY+(this.opt.labelspace*this.opt.categories_on_bottom)-1);
 		//DRAW LABELS
 		this.ctx.font = "10pt 'Calibri'";
 		this.ctx.fillStyle = "#666";
 		this.ctx.textAlign = "center";
-		this.ctx.fillText(this.catAx.title, this.opt.cw/2, this.opt.ch-5);		//X AXIS
-		this.ctx.rotate(-Math.PI/2);
-		this.ctx.fillText(this.metAx.title, -this.opt.ch/2, 10);		//Y AXIS
-		this.ctx.rotate(Math.PI/2);
+		if(typeof(this.catAx.title) == "string") {
+			this.ctx.fillText(this.catAx.title, this.opt.cw/2, this.opt.ch-5);		//X AXIS
+		} if(typeof(this.metAx.title) == "string") {
+			this.ctx.rotate(-Math.PI/2);
+			this.ctx.fillText(this.metAx.title, -this.opt.ch/2, 10);		//Y AXIS
+			this.ctx.rotate(Math.PI/2);
+		}
 		if(this.opt.categories_on_side + this.opt.categories_on_bottom > 0) {
 			//ITEM LABELS
 			this.ctx.font = "11pt 'Calibri'";
