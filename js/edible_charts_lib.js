@@ -11,6 +11,11 @@ function hexToB(h) {return parseInt((cutHex(h)).substring(4,6),16);}
 function getR(rgb) {return parseInt(rgb.match(/\((\d+), ?(\d+), ?(\d+)/)[1]); }
 function getG(rgb) {return parseInt(rgb.match(/\((\d+), ?(\d+), ?(\d+)/)[2]); }
 function getB(rgb) {return parseInt(rgb.match(/\((\d+), ?(\d+), ?(\d+)/)[3]); }
+//INSERT HTML AFTER NODE FUNCTION
+function insertAfter(referenceNode,newNode)
+{referenceNode.parentNode.insertBefore(newNode,referenceNode.nextSibling);}
+//RANDOM STRING GENERATOR FOR NAMING IDS
+function makeId(){var text = ""; var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for( var i=0; i < 5; i++ ) { text += possible.charAt(Math.floor(Math.random() * possible.length)); } return text; }
 
 var Chart = Class.extend({
 	init: function(canvas_name, options){
@@ -397,6 +402,16 @@ var Pie = Chart.extend({
 			}
 			//MAXIGAP SHOULD BE REDUCED FOR PIE CHARTS
 			this.opt.maxigap = this.opt.maxigap/2;
+			//PRE-DRAW SPINNER
+			var spnode=document.createElement('canvas');
+			this.opt.spinner_id = makeId();
+			spnode.id = this.opt.spinner_id;
+			spnode.style = "display:none;";
+			spnode.height = (this.opt.r+20) + "px";
+			spnode.width = (this.opt.r+20) + "px";
+			insertAfter(this.canvas,spnode);
+			var tctx = spnode.getContext("2d");
+			
 			var _this = this;
 			
 			this.interval = setInterval(function() {_this.draw();}, 1000/30);
